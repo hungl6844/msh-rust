@@ -1,18 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone)]
+#[serde(default)]
 pub struct Config {
-    #[serde(default)]
     pub server_file: String,
-    #[serde(default)]
     pub java_path: String,
-    #[serde(default)]
     pub arguments: Vec<String>,
-    #[serde(default)]
     pub proxy_port: u16,
-    #[serde(default)]
     pub server_port: u16,
-    #[serde(default)]
     pub protocol_ver: i32,
 }
 
@@ -49,9 +44,10 @@ pub enum ServerboundPackets {
 }
 
 #[derive(Debug)]
+#[repr(u8)]
 pub enum State {
-    Status,
-    Login,
+    Status = 1,
+    Login = 2,
 }
 
 impl TryFrom<Vec<u8>> for ServerboundPackets {
@@ -71,21 +67,14 @@ impl TryFrom<Vec<u8>> for ServerboundPackets {
 
                 let protocol_ver = value[i];
                 i += 1;
-                println!("protocol ver is {}", &protocol_ver);
 
                 let str_len = value[i];
                 i += 1;
-                let subvec = &value[i..(str_len as usize + i)];
-                let address = String::from_utf8(subvec.into()).unwrap();
-                println!(
-                    "address is {}, and length is {}, str_len being {}",
-                    &address,
-                    &address.len(),
-                    &str_len
-                );
+
+                let address = String::from_utf8(value[i..(str_len as usize + i)].into()).unwrap();
+
                 i += str_len as usize;
 
-                eprintln!("protocol_ver: {}, address: {}", protocol_ver, address);
                 let port = (value[i] as u16) << 8 | (value[i + 1] as u16);
                 i += 2;
 
@@ -166,9 +155,6 @@ impl From<ServerboundPackets> for Vec<u8> {
 
 impl From<State> for u8 {
     fn from(value: State) -> Self {
-        match value {
-            State::Status => 1,
-            State::Login => 2,
-        }
+        value as u8
     }
 }
