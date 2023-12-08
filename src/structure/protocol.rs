@@ -1,5 +1,48 @@
 use std::{error, fmt::Debug, io};
 use tokio::io::AsyncReadExt;
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusJson {
+    pub version: Version,
+    pub players: Players,
+    pub description: Description,
+    pub favicon: String,
+    pub enforces_secure_chat: bool,
+    pub previews_chat: bool,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Version {
+    pub name: String,
+    pub protocol: i64,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Players {
+    pub max: i64,
+    pub online: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample: Option<Vec<Sample>>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Sample {
+    pub name: String,
+    pub id: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Description {
+    pub text: String,
+}
+
 
 const SEGMENT_BITS: u8 = 0x7F;
 const CONTINUE_BIT: u8 = 0x80;

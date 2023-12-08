@@ -4,7 +4,7 @@ use structure::{config::Config, protocol::parse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-use crate::structure::protocol::{self, ServerboundPackets};
+use crate::structure::protocol::{self, ServerboundPackets, StatusJson, Version, Players, Sample, Description, write_varint};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -71,6 +71,41 @@ async fn proxy(/*child: &Child,*/ config: &Config) -> Result<(), Box<dyn std::er
                     stream.writable().await?;
                     let packet_bytes: Vec<u8> = protocol::to_bytes(packet).await;
                     stream.write_all(packet_bytes.as_slice()).await?;
+                }
+
+                ServerboundPackets::StatusRequest { .. } => {
+                    let mut buf = vec![0_u8];
+                    let mut json_bytes = serde_json::ser::to_vec_pretty(&StatusJson {
+                        version: Version {
+                            name: "1.19.4".to_string(),
+                            protocol: 762
+                        },
+
+                        players: Players {
+                            max: 100,
+                            online: 0,
+                            sample: None
+                        },
+
+                        description: Description {
+                            text: "hello world".to_string()
+                        },
+
+                        favicon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAAPElEQVR42u3OMQEAAAgDIJfc6BpjDyQgt1MVAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBgXbgARTAX8ECcrkoAAAAAElFTkSuQmCC".to_string(),
+                        enforces_secure_chat: true,
+                        previews_chat: true
+                    })?;
+                    println!("{}", String::from_utf8(json_bytes.clone())?);
+                    let mut json_len: Vec<u8> = vec![];
+                    write_varint(&mut json_len, json_bytes.len() as i64)?;
+                    buf.append(&mut json_len);
+                    buf.append(&mut json_bytes);
+                    println!("{buf:?}");
+                    stream.writable().await?;
+                    let mut varint: Vec<u8> = vec![];
+                    write_varint(&mut varint, buf.len() as i64)?;
+                    stream.write_all(&varint).await?;
+                    stream.write_all(buf.as_slice()).await?;
                 }
 
                 _ => {
