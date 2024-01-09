@@ -46,8 +46,7 @@ impl Config {
 
         if config_str.is_empty() {
             file.write_all(toml::to_string(&Config::default())?.as_bytes())?;
-            file.write_all("# the protocol version can either be left blank to force a server start, or filled using your server's version using `https://wiki.vg/Protocol_version_numbers`. Filling the protocol version
-is recommended because it will allow the proxy itself to reject the connection, rather than starting the server and it having to reject the clients on the wrong versions.".as_bytes())?;
+            file.write_all("# the protocol version can either be left blank to force a server start, or filled using your server's version using `https://wiki.vg/Protocol_version_numbers`. Filling the protocol version is recommended because it will allow the proxy itself to reject the connection, rather than starting the server and it having to reject the clients on the wrong versions.".as_bytes())?;
             return Err("your config file did not exist. a default config file has been created. please review the fields and make any changes nessecary.".into());
         }
 

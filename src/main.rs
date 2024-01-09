@@ -1,30 +1,32 @@
 mod structure;
 
-use structure::{config::Config, protocol::parse};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use std::io::Cursor;
 
-use crate::structure::protocol::{self, ServerboundPackets, StatusJson, Version, Players, Sample, Description, write_varint};
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
+use image::ImageOutputFormat;
+use structure::{config::Config, protocol::parse};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::process::{Command, Child};
+
+use crate::structure::protocol::{self, ServerboundPackets, StatusJson, Version, Players, Description, write_varint, State};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /*    let server = Command::new(&config.java_path)
+    let config = Config::try_new("config.toml")?;
+    let server = Command::new(&config.java_path)
     .arg("-jar")
     .arg(&config.server_file)
     .args(&config.arguments)
-    .stdin(Stdio::inherit())
-    .stdout(Stdio::inherit())
-    .stderr(Stdio::inherit())
     .spawn()
-    .expect("failed to spawn child process");*/
+    .expect("failed to spawn child process");
 
-    proxy(/*&server,*/ &Config::try_new("config.toml")?).await?;
+    proxy(&server, &config).await?;
     Ok(())
 }
 
-async fn proxy(/*child: &Child,*/ config: &Config) -> Result<(), Box<dyn std::error::Error>> {
-    // thread::sleep(Duration::from_millis(10000));
-    // println!("out of sleep!");
+#[allow(unreachable_patterns)] async fn proxy(child: &Child, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     let listener =
         TcpListener::bind("127.0.0.1:".to_string() + &config.proxy_port.to_string()).await?;
     println!("listening on {}", &config.proxy_port);
@@ -58,7 +60,14 @@ async fn proxy(/*child: &Child,*/ config: &Config) -> Result<(), Box<dyn std::er
 
             match packet {
                 ServerboundPackets::Handshake { next_state, .. } => {
-                    status = next_state;
+                    if next_state == State::Login {
+                        tokio::spawn(async move {
+                            let read = BufReader::new(stream);
+                            let server = TcpStream::connect("localhost:".to_string() + &config.server_port.to_string()).await?;
+
+                            Ok(())
+                        });
+                    }
                 }
 
                 ServerboundPackets::PingRequest { .. } => {
@@ -74,6 +83,10 @@ async fn proxy(/*child: &Child,*/ config: &Config) -> Result<(), Box<dyn std::er
                 }
 
                 ServerboundPackets::StatusRequest { .. } => {
+                    let img = image::open("favicon.png")?;
+                    let mut image_bytes: Cursor<Vec<u8>> = Cursor::new(vec![]);
+                    img.write_to(&mut image_bytes, ImageOutputFormat::Png)?;
+
                     let mut buf = vec![0_u8];
                     let mut json_bytes = serde_json::ser::to_vec_pretty(&StatusJson {
                         version: Version {
@@ -91,7 +104,7 @@ async fn proxy(/*child: &Child,*/ config: &Config) -> Result<(), Box<dyn std::er
                             text: "hello world".to_string()
                         },
 
-                        favicon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAAPElEQVR42u3OMQEAAAgDIJfc6BpjDyQgt1MVAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBgXbgARTAX8ECcrkoAAAAAElFTkSuQmCC".to_string(),
+                        favicon: "data:image/png;base64,".to_string() + BASE64_STANDARD.encode(image_bytes.into_inner()).as_str(),
                         enforces_secure_chat: true,
                         previews_chat: true
                     })?;
