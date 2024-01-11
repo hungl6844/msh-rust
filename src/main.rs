@@ -9,6 +9,7 @@ use structure::{config::Config, protocol::parse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{Command, Child};
+use tokio::select;
 
 use crate::structure::protocol::{self, ServerboundPackets, StatusJson, Version, Players, Description, write_varint, State};
 
@@ -22,11 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .spawn()
     .expect("failed to spawn child process");
 
-    proxy(&server, &config).await?;
+    proxy(&server, config).await?;
     Ok(())
 }
 
-#[allow(unreachable_patterns)] async fn proxy(child: &Child, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+#[allow(unreachable_patterns)] async fn proxy(child: &Child, config: Config) -> Result<(), Box<dyn std::error::Error>> {
     let listener =
         TcpListener::bind("127.0.0.1:".to_string() + &config.proxy_port.to_string()).await?;
     println!("listening on {}", &config.proxy_port);
@@ -62,12 +63,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ServerboundPackets::Handshake { next_state, .. } => {
                     if next_state == State::Login {
                         tokio::spawn(async move {
-                            let read = BufReader::new(stream);
-                            let server = TcpStream::connect("localhost:".to_string() + &config.server_port.to_string()).await?;
+                            let mut server = TcpStream::connect("localhost:".to_string() + &config.server_port.to_string()).await?;
+                            server.write_all(buf.as_slice()).await?;
 
-                            Ok(())
+                            tokio::spawn(async move {
+                                let (mut client_read, mut client_write) = tokio::io::split(stream);
+                                let (mut server_read, mut server_write) = tokio::io::split(server);
+                                
+                                tokio::join!(
+                                    async {
+                                        loop {
+                                            let length = match client_read.read_u8().await {
+                                                Ok(l) => l,
+                                                Err(_) => break
+                                            };
+
+                                            let mut buf: Vec<u8> = ;
+                                        }
+                                    }
+                                );
+                            });
+
+                            Ok::<(), tokio::io::Error>(())
                         });
+                        continue 'conn;
                     }
+
+                    status = next_state;
                 }
 
                 ServerboundPackets::PingRequest { .. } => {
