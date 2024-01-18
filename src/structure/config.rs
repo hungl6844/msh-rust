@@ -15,6 +15,7 @@ pub struct Config {
     pub proxy_port: u16,
     pub server_port: u16,
     pub protocol_ver: i32,
+    pub suspend_timeout: u64,
 }
 
 impl Default for Config {
@@ -25,10 +26,8 @@ impl Default for Config {
             arguments: vec!["nogui".to_string()],
             proxy_port: 25565,
             server_port: 25575,
-            protocol_ver: 763, // this protocol version can be found in the protocol docs. it may not always be up to
-                               // date, so the newest versions may be difficult to use. if this field is left blank, I
-                               // will implement a system to pass the connect to the server directly instead of
-                               // refusing from the proxy.
+            protocol_ver: 763, // this protocol version can be found in the protocol docs. it may not always be up to date, so the newest versions may be difficult to use. if this field is left blank, I will implement a system to pass the connect to the server directly instead of refusing from the proxy.
+            suspend_timeout: 300,
         }
     }
 }
@@ -46,7 +45,10 @@ impl Config {
 
         if config_str.is_empty() {
             file.write_all(toml::to_string(&Config::default())?.as_bytes())?;
-            file.write_all("# the protocol version can either be left blank to force a server start, or filled using your server's version using `https://wiki.vg/Protocol_version_numbers`. Filling the protocol version is recommended because it will allow the proxy itself to reject the connection, rather than starting the server and it having to reject the clients on the wrong versions.".as_bytes())?;
+            file.write_all(
+                "# visit `https://wiki.vg/Protocol_version_numbers` for your corresponding number."
+                    .as_bytes(),
+            )?;
             return Err("your config file did not exist. a default config file has been created. please review the fields and make any changes nessecary.".into());
         }
 

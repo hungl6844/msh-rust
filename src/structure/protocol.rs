@@ -1,7 +1,7 @@
-use std::{error, fmt::Debug, io};
-use tokio::io::AsyncReadExt;
 use serde::Deserialize;
 use serde::Serialize;
+use std::{error, fmt::Debug, io};
+use tokio::io::AsyncReadExt;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,7 +42,6 @@ pub struct Sample {
 pub struct Description {
     pub text: String,
 }
-
 
 const SEGMENT_BITS: u8 = 0x7F;
 const CONTINUE_BIT: u8 = 0x80;
