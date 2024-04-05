@@ -2,9 +2,10 @@ mod structure;
 
 use structure::{config::Config, protocol::parse};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::spawn;
 
-use crate::structure::protocol::{self, ServerboundPackets, StatusJson, Version, Players, Sample, Description, write_varint};
+use crate::structure::protocol::{self, ServerboundPackets, StatusJson, Version, Players, Description, write_varint, State};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,7 +39,7 @@ async fn proxy(/*child: &Child,*/ config: &Config) -> Result<(), Box<dyn std::er
         let (mut stream, address) = client.unwrap();
         println!("new client connected from: {}", address);
 
-        let mut status = protocol::State::Listening;
+        let mut status = State::Listening;
 
         loop {
             stream.readable().await?;
@@ -62,7 +63,7 @@ async fn proxy(/*child: &Child,*/ config: &Config) -> Result<(), Box<dyn std::er
                 }
 
                 ServerboundPackets::PingRequest { .. } => {
-                    if status != protocol::State::Status {
+                    if status != State::Status {
                         eprintln!("wrong state! state was {status:?}, should have been Status");
                         stream.shutdown().await?;
                         continue 'conn;
@@ -108,8 +109,15 @@ async fn proxy(/*child: &Child,*/ config: &Config) -> Result<(), Box<dyn std::er
                     stream.write_all(buf.as_slice()).await?;
                 }
 
-                _ => {
-                    return Err("uninplemented packet".into());
+                ServerboundPackets::Unimplemented => {
+                    if status == State::Login {
+                        let cport = config.server_port;
+                        spawn(async move {
+                            let mut server = TcpStream::connect(("127.0.0.1", cport)).await.unwrap();
+                            tokio::io::copy_bidirectional(&mut server, &mut stream).await.unwrap();
+                        });
+                        continue 'conn;
+                    }
                 }
             }
         }

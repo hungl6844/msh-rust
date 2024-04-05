@@ -64,6 +64,7 @@ pub enum ServerboundPackets {
         id: u8,
         payload: i64,
     },
+    Unimplemented
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,9 +144,7 @@ where
         }
 
         _ => {
-            // this is a scenario that I don't want to think about because I might have to
-            // redesign this entire project over it
-            Err("this packet is unimplemented".into())
+            Ok(ServerboundPackets::Unimplemented) 
         }
     }
 }
@@ -185,6 +184,10 @@ pub async fn to_bytes(value: ServerboundPackets) -> Vec<u8> {
         ServerboundPackets::StatusRequest { id } => {
             byte_array.push(1);
             byte_array.push(id);
+        }
+
+        ServerboundPackets::Unimplemented => {
+           eprintln!("cannot convert to bytes, returning empty vec (this will be fixed after thiserror setup)") ;
         }
     };
 
